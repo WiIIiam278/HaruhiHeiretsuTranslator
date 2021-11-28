@@ -100,9 +100,10 @@ public class TranslatorApp {
             fileSaver.addChoosableFileFilter(new BinFileFilter());
             fileSaver.setAcceptAllFileFilterUsed(true);
             fileSaver.setSelectedFile(new File(currentDir.getPath() + File.separator + "00000003.bin"));
-            fileSaver.setApproveButtonText("Save");
-            fileSaver.setApproveButtonToolTipText("Save the file here");
-            fileSaver.showOpenDialog(MainPanel);
+            int result = fileSaver.showSaveDialog(MainPanel);
+            if (result != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
             String selectedPath = fileSaver.getSelectedFile() != null ? fileSaver.getSelectedFile().getCanonicalPath() : "";
             if (selectedPath.isEmpty()) {
                 return;
@@ -120,7 +121,10 @@ public class TranslatorApp {
         fileBrowser.setFileSelectionMode(JFileChooser.FILES_ONLY);
         fileBrowser.addChoosableFileFilter(new BinFileFilter());
         fileBrowser.setAcceptAllFileFilterUsed(true);
-        fileBrowser.showOpenDialog(MainPanel);
+        int option = fileBrowser.showOpenDialog(MainPanel);
+        if (option != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
         String selectedPath = fileBrowser.getSelectedFile() != null ? fileBrowser.getSelectedFile().getPath() : "";
         workingDirectory = new File(selectedPath).getParentFile();
         SelectedFilePath.setText(selectedPath);
@@ -138,13 +142,34 @@ public class TranslatorApp {
             return;
         }
         int rows = FileEditorData.getText().split("\n").length;
+
+        // Save a new ScriptFile with changes from source
         ScriptFile newFile = new ScriptFile(loadedFile);
         for (int row = 0; row < rows; row++) {
             ScriptFile.DataItem sequenceBeingEdited = loadedFile.data.stream().filter(data -> (data.isSequence)).toList().get(row);
             String currentRowText = getRowText(row);
             if (sequenceBeingEdited != null && currentRowText != null) {
                 byte[] currentRowBytes = ScriptFile.DataItem.toByteArray(currentRowText);
-                newFile.updateDataSequence(new ScriptFile.DataItem(currentRowBytes, true, sequenceBeingEdited.uuid));
+
+                // Verify the byte length; if it's too short, append with 0x20, if it's too long, abort with error
+                byte[] verifiedBytes = new byte[sequenceBeingEdited.data.length];
+                System.arraycopy(currentRowBytes, 0, verifiedBytes, 0, verifiedBytes.length);
+                if (currentRowBytes.length > sequenceBeingEdited.data.length) {
+                    // Determine the difference and show error to user
+                    final int lengthDifference = currentRowBytes.length - sequenceBeingEdited.data.length;
+                    final String pluralByteIndicator = lengthDifference == 1 ? "" : "s"; // Show "byte" instead of "bytes" if only one byte is affected
+                    JOptionPane.showMessageDialog(MainPanel, "Failed to save file:\nError on line #" + row + "; " + lengthDifference + " byte" + pluralByteIndicator + " too long.",
+                            "Error saving file", JOptionPane.ERROR_MESSAGE);
+                    return;
+                } else if (currentRowBytes.length < sequenceBeingEdited.data.length) {
+                    // Add 0x20 (SPACE) until it's the needed length
+                    for (int i = currentRowBytes.length-1; i < verifiedBytes.length; i++) {
+                        verifiedBytes[i] = 0x20;
+                    }
+                }
+
+                // Update the DataItem with the new one
+                newFile.updateDataSequence(new ScriptFile.DataItem(verifiedBytes, true, sequenceBeingEdited.uuid));
             }
         }
         ScriptFileSaver.saveScript(newFile, filePath);

@@ -2,14 +2,14 @@ package me.William278.gui;
 
 import me.William278.translator.script.ScriptFile;
 import me.William278.translator.script.ScriptFileReader;
+import me.William278.translator.script.ScriptFileSaver;
 
 import javax.swing.*;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Caret;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -17,40 +17,33 @@ import java.util.Arrays;
 import java.util.StringJoiner;
 
 public class TranslatorApp {
-    private JTextArea FilePreviewData;
+    private JTextArea FileEditorData;
     private JPanel MainPanel;
     private JTextField SelectedFilePath;
-    private JButton ReadFileButton;
     private JButton BrowseButton;
-    private JScrollPane FilePreviewScrollPane;
+    private JScrollPane FileEditorScrollPane;
     private JButton SaveButton;
     private JLabel EditingTooltip;
 
     public static ScriptFile loadedFile;
+    public static File workingDirectory = new File(System.getProperty("user.home"));
 
     public TranslatorApp() {
         // When a user presses the Browse button
         BrowseButton.addActionListener(e -> onBrowseButtonPressed());
 
         // Set default text of text box
-        FilePreviewData.setText("Select a 3.bin file to load, then select \"Read File\"\n\n\n\n\n\n\n\n");
+        FileEditorData.setText("Select a file to edit...\n\n\n\n\n\n\n\n");
 
         // When a user moves the caret
-        FilePreviewData.addCaretListener(new CaretListener() {
-            /**
-             * Called when the caret position is updated.
-             *
-             * @param e the caret event
-             */
-            @Override
-            public void caretUpdate(CaretEvent e) {
-                updateEditingTooltip();
-            }
-        });
+        FileEditorData.addCaretListener(e -> updateEditingTooltip());
+
+        // When a user presses the Save As button
+        SaveButton.addActionListener(e -> onSaveAsButtonPressed());
     }
 
     private String getRowText(int row) {
-        String[] textArray = FilePreviewData.getText().split("\n");
+        String[] textArray = FileEditorData.getText().split("\n");
         ArrayList<String> rowText = new ArrayList<>(Arrays.asList(textArray));
         if (row < 0 || row >= rowText.size()) {
             return null;
@@ -59,21 +52,24 @@ public class TranslatorApp {
     }
 
     private void updateEditingTooltip() {
+        if (!FileEditorData.isEditable()) {
+            return;
+        }
         try {
-            Caret caret = FilePreviewData.getCaret();
+            Caret caret = FileEditorData.getCaret();
             if (caret != null) {
-                int caretPosition = FilePreviewData.getCaretPosition();
-                int row = FilePreviewData.getLineOfOffset(caretPosition);
-                if (row >= 0 && row < loadedFile.lines.size()) {
-                    ScriptFile.DataSequence sequence = loadedFile.lines.get(row);
+                int caretPosition = FileEditorData.getCaretPosition();
+                int row = FileEditorData.getLineOfOffset(caretPosition);
+                if (row >= 0 && row < loadedFile.data.size()) {
+                    ScriptFile.DataItem sequence = loadedFile.data.stream().filter(dataItem -> dataItem.isSequence).toList().get(row);
                     String currentRowText = getRowText(row);
                     if (sequence != null && currentRowText != null) {
                         byte[] currentRowBytes = currentRowText.getBytes(Charset.forName("SHIFT_JIS"));
-                        EditingTooltip.setText("Editing: " + row + " (" + currentRowBytes.length + "/" + sequence.textData().length + ")");
+                        EditingTooltip.setText("Editing Line: " + row + " (" + currentRowBytes.length + "/" + sequence.data.length + ")");
                         return;
                     }
                 }
-                EditingTooltip.setText("Editing: " + row);
+                EditingTooltip.setText("Editing Line: " + row);
             }
         } catch (BadLocationException e) {
             JOptionPane.showMessageDialog(MainPanel, "Error: BadLocationException",
@@ -82,28 +78,78 @@ public class TranslatorApp {
         }
     }
 
-    private void onBrowseButtonPressed() {
-        JFileChooser j = new JFileChooser();
-        j.setCurrentDirectory(new File(System.getProperty("user.home")));
-        j.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        j.addChoosableFileFilter(new FileFilter() {
-            public String getDescription() {
-                return "Suzumiya Haruhi no Heiretsu Text Binaries (*.bin)";
-            }
+    public static class BinFileFilter extends FileFilter {
+        public String getDescription() {
+            return "Suzumiya Haruhi no Heiretsu Text Binaries (*.bin)";
+        }
 
-            public boolean accept(File f) {
-                if (f.isDirectory()) {
-                    return true;
-                } else {
-                    return f.getName().toLowerCase().endsWith(".bin");
-                }
+        public boolean accept(File f) {
+            if (f.isDirectory()) {
+                return true;
+            } else {
+                return f.getName().toLowerCase().endsWith(".bin");
             }
-        });
-        j.setAcceptAllFileFilterUsed(true);
-        j.showOpenDialog(MainPanel);
-        String selectedPath = j.getSelectedFile() != null ? j.getSelectedFile().getPath() : "";
+        }
+    }
+
+    private void onSaveAsButtonPressed() {
+        try {
+            File currentDir = workingDirectory;
+            JFileChooser fileSaver = new JFileChooser();
+            fileSaver.setCurrentDirectory(currentDir);
+            fileSaver.addChoosableFileFilter(new BinFileFilter());
+            fileSaver.setAcceptAllFileFilterUsed(true);
+            fileSaver.setSelectedFile(new File(currentDir.getPath() + File.separator + "00000003.bin"));
+            fileSaver.setApproveButtonText("Save");
+            fileSaver.setApproveButtonToolTipText("Save the file here");
+            fileSaver.showOpenDialog(MainPanel);
+            String selectedPath = fileSaver.getSelectedFile() != null ? fileSaver.getSelectedFile().getCanonicalPath() : "";
+            if (selectedPath.isEmpty()) {
+                return;
+            }
+            saveFile(selectedPath);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(MainPanel, "Please select where you want to save the bin",
+                    "Error saving file", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void onBrowseButtonPressed() {
+        JFileChooser fileBrowser = new JFileChooser();
+        fileBrowser.setCurrentDirectory(workingDirectory);
+        fileBrowser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileBrowser.addChoosableFileFilter(new BinFileFilter());
+        fileBrowser.setAcceptAllFileFilterUsed(true);
+        fileBrowser.showOpenDialog(MainPanel);
+        String selectedPath = fileBrowser.getSelectedFile() != null ? fileBrowser.getSelectedFile().getPath() : "";
+        workingDirectory = new File(selectedPath).getParentFile();
         SelectedFilePath.setText(selectedPath);
+        if (selectedPath.isEmpty()) {
+            return;
+        }
         readFile();
+    }
+
+    private void saveFile(String filePath) {
+        File file = new File(filePath);
+        if (file.exists()) {
+            JOptionPane.showMessageDialog(MainPanel, "You cannot overwrite an existing file!",
+                    "Error saving file", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        int rows = FileEditorData.getText().split("\n").length;
+        ScriptFile newFile = new ScriptFile(loadedFile);
+        for (int row = 0; row < rows; row++) {
+            ScriptFile.DataItem sequenceBeingEdited = loadedFile.data.stream().filter(data -> (data.isSequence)).toList().get(row);
+            String currentRowText = getRowText(row);
+            if (sequenceBeingEdited != null && currentRowText != null) {
+                byte[] currentRowBytes = ScriptFile.DataItem.toByteArray(currentRowText);
+                newFile.updateDataSequence(new ScriptFile.DataItem(currentRowBytes, true, sequenceBeingEdited.uuid));
+            }
+        }
+        ScriptFileSaver.saveScript(newFile, filePath);
+        JOptionPane.showMessageDialog(MainPanel, "Saved to " + filePath,
+                "File saved successfully", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void readFile() {
@@ -119,23 +165,28 @@ public class TranslatorApp {
             return;
         }
         loadedFile = readScript;
+
         setTextFromScriptFile();
     }
 
     private void setTextFromScriptFile() {
         ScriptFile file = loadedFile;
         StringJoiner textToSet = new StringJoiner("\n");
-        for (ScriptFile.DataSequence line : file.lines) {
-            textToSet.add(line.toShiftJis());
+        for (ScriptFile.DataItem dataItem : file.data.stream().filter(dataItem -> dataItem.isSequence).toList()) {
+            textToSet.add(dataItem.toShiftJis());
         }
 
         // Update the text
-        FilePreviewData.setText(textToSet.toString());
+        FileEditorData.setText(textToSet.toString());
+
+        // Enable options
+        FileEditorData.setEditable(true);
+        SaveButton.setEnabled(true);
 
         // Set the vertical scrollbar and ticking caret positions to 0
         SwingUtilities.invokeLater(() -> {
-            FilePreviewData.setCaretPosition(0);
-            FilePreviewScrollPane.getVerticalScrollBar().setValue(0);
+            FileEditorData.setCaretPosition(0);
+            FileEditorScrollPane.getVerticalScrollBar().setValue(0);
         });
     }
 

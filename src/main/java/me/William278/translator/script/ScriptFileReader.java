@@ -1,8 +1,10 @@
 package me.William278.translator.script;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.List;
 
 /*
  * This class reads in script files for Suzumiya Haruhi no Heiretsu
@@ -10,81 +12,99 @@ import java.util.ArrayList;
  */
 public class ScriptFileReader {
 
-    public static ScriptFile readFile(String filePath) {
+    public static byte[] readToByteArray(String filePath) throws IOException {
         // Get the file at the path; return null if it does not exist
         File file = new File(filePath);
         if (!file.exists()) {
-            return null;
+            return new byte[0];
         }
+        return Files.readAllBytes(file.toPath());
+    }
 
+    public static ScriptFile readFile(String filePath) {
         ScriptFile scriptFile = new ScriptFile();
         try {
-            // Load the file as a byte array
-            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            // Load the file into a byte array
+            final byte[] fileBytes = readToByteArray(filePath);
 
-            // Iterate through every byte in the array to find "sequences" (text, control codes and voice line identifiers)
-            int zeroBytes = 0; // Number of consecutive NULL (0x00 bytes) read
-            int sequenceStartIndex = 0; // Index number in byte array where the sequence starts
-            short sequenceLength = 0; // Length of the sequence, indicated by the first byte
-            ArrayList<Byte> sequenceArray = new ArrayList<>(); // Array of the last bytes that have been read
+            // Return null if the file could not be read
+            if (fileBytes.length == 0) {
+                return null;
+            }
 
-            for (int fileIndex = 0; fileIndex < fileBytes.length; fileIndex++) {
-                if (sequenceArray.isEmpty()) {
-                    sequenceStartIndex = fileIndex;
-                }
-                byte currentByte = fileBytes[fileIndex];
+            // Initialize byte iteration flags
+            short consecutiveZeroes = 0; // The number of consecutive 0x00 (NULL) bytes read
+            ArrayList<Byte> currentSequence = new ArrayList<>(); // The current sequence
+            byte sequenceSize = 0x00; // Byte representing the size of the sequence
 
+            // Iterate through every byte
+            for (byte currentByte : fileBytes) {
                 if (currentByte == 0x00) {
-                    zeroBytes++;
-                    if (zeroBytes == 4) {
-                        // Add new line to the script file object
-                        if (sequenceLength == sequenceArray.size()) {
-                            scriptFile.addLanguageLine(getLineFromCurrentSequence(sequenceArray, sequenceStartIndex));
-                        }
-
-                        // Reset current sequence
-                        zeroBytes = 0;
-                        sequenceLength = 0;
-                        sequenceArray.clear();
-                    }
+                    consecutiveZeroes++;
                 } else {
-                    zeroBytes = 0;
+                    consecutiveZeroes = 0;
+                }
 
-                    // If it is the first byte in the sequence, try to read it as the sequence length
-                    if (sequenceArray.isEmpty()) {
-                        sequenceLength = currentByte;
+                // Set the current byte to equal the sequence size
+                if (currentSequence.isEmpty()) {
+                    sequenceSize = currentByte;
+                }
+
+                // Add the current byte to the current sequence
+                currentSequence.add(currentByte);
+
+                if (consecutiveZeroes == 4) {
+                    final List<Byte> sequenceToAdd = currentSequence.subList(0, currentSequence.size()-4);
+                    final List<Byte> zeroesToAdd = currentSequence.subList(currentSequence.size()-4, currentSequence.size());
+
+                    // If the sequence size matches the byte count of sequence to add, add it
+                    if (sequenceToAdd.size() == sequenceSize && sequenceSize > 2) {
+                        final List<Byte> sizeByteToAdd = sequenceToAdd.subList(0, 1);
+                        final List<Byte> dataBytesToAdd = sequenceToAdd.subList(1, sequenceToAdd.size());
+
+                        scriptFile.addDataItem(getDataItem(sizeByteToAdd, false));
+                        scriptFile.addDataItem(getDataItem(dataBytesToAdd, true));
+                    } else {
+                        scriptFile.addDataItem(getDataItem(sequenceToAdd, false));
                     }
+                    scriptFile.addDataItem(getDataItem(zeroesToAdd, false));
 
-                    // Replace new line characters with 0xFF
-                    if (currentByte == 0x0A) {
-                        sequenceArray.add((byte) 0xFF);
-                        continue;
-                    }
-
-                    sequenceArray.add(currentByte);
+                    // Reset flags
+                    consecutiveZeroes = 0;
+                    currentSequence = new ArrayList<>();
+                    sequenceSize = 0x00;
                 }
             }
-            if (sequenceLength == sequenceArray.size()) {
-                scriptFile.addLanguageLine(getLineFromCurrentSequence(sequenceArray, sequenceStartIndex));
+            // Add leftover data at end of file byte array
+            if (!currentSequence.isEmpty()) {
+                scriptFile.addDataItem(getDataItem(currentSequence, false));
             }
-        } catch (Exception e) {
+
+        } catch (IOException e) {
             System.out.println("An error occurred reading the file");
+            e.printStackTrace();
             return null;
         }
         return scriptFile;
     }
 
-    // Returns a new LanguageLine from the current sequence
-    private static ScriptFile.DataSequence getLineFromCurrentSequence(ArrayList<Byte> currentSequence, int sequenceStartIndex) {
+    public static byte[] toByteArray(List<Byte> byteArray) {
         // Convert sequence ArrayList to byte array
-        byte[] data = new byte[currentSequence.size()];
+        byte[] data = new byte[byteArray.size()];
 
         // Starting at index 1 to skip first "sequence length" byte
-        for(int i = 1; i < currentSequence.size(); i++) {
-            data[i-1] = currentSequence.get(i);
+        for (int i = 0; i < byteArray.size(); i++) {
+            data[i] = byteArray.get(i);
         }
-
-        // Add new line to the script file object
-        return new ScriptFile.DataSequence(data, sequenceStartIndex);
+        return data;
     }
+
+    // Get a DataItem from a byte array and assign it a flag if it is a text / information sequence
+    private static ScriptFile.DataItem getDataItem(List<Byte> currentSequence, boolean isSequence) {
+        // Convert sequence ArrayList to byte array
+        byte[] data = toByteArray(currentSequence);
+
+        return new ScriptFile.DataItem(data, isSequence);
+    }
+
 }

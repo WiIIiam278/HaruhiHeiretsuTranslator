@@ -1,8 +1,8 @@
-![Suzumiya Haruhi no Heiretsu Translator](images/Translator Banner.png)
+![Suzumiya Haruhi no Heiretsu Translator](images/Banner.png)
 # Suzumiya Haruhi no Heiretsu Translator
 This tool allows for the editing and translating of **Suzumiya Haruhi no Heiretsu** (_Wii, 2009;_ EN: _The Parallel of Haruhi Suzumiya_) binary files that contain Japanese script data, to facilitate the production of an English patch.
 
-![Haruhi speaking English](images/Screenshot 1.png)
+![Haruhi speaking English](images/Screenshot-1.png)
 
 ## How to use
 ### Requirements
@@ -67,7 +67,7 @@ This tool allows for the editing and translating of **Suzumiya Haruhi no Heirets
     1. If you edited 75.bin and want to see your results, start a new game, then skip the intro cutscene (PLUS button) and select then press the A button to start the dialogue with Haruhi.
     2. If you get an Invalid Read error in Dolphin when loading your patched ISO, you've done something wrong - make sure you read the "important things" above about how the game stores text.
 
-![The intro to the game, translated.](images/Screenshot 2.png)
+![The intro to the game, translated.](images/Screenshot-2.png)
 
 ## Future plans
 As mentioned, the objective is to create a similar application to this that automatically extracts an ISO with wit, extracts the bln directories directly without need for Kuriimu, patches the Japanese binary files with English ones created with this tool and then uses wit to recompose the ISO disk image once again.

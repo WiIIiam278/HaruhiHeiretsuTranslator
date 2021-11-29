@@ -1,4 +1,4 @@
-package me.William278.translator.script;
+package me.William278.haruhiheiretsutranslator.parser;
 
 import java.io.File;
 import java.io.IOException;

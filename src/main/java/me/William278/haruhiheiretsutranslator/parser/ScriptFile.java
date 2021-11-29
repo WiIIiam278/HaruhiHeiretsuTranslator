@@ -1,7 +1,6 @@
-package me.William278.translator.script;
+package me.William278.haruhiheiretsutranslator.parser;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.UUID;
 

@@ -75,5 +75,6 @@ As mentioned, the objective is to create a similar application to this that auto
 Tl;dr: Use this to make an english patch and then make an english patcher tool.
 
 ## Building this tool
-This tool is built with maven using IntelliJ IDEA's GUI builder. IntelliJ IDEA (Community or Ultimate) 2020.2 is recommended as a result+
+This tool is built with maven using IntelliJ IDEA's GUI builder. IntelliJ IDEA (Community or Ultimate) 2020.2 is recommended as a result.
+
 To build, import it into IntelliJ and create a maven configuration with `clean package` command line arguments. Run it and it should build.

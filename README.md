@@ -69,7 +69,20 @@ This tool allows for the editing and translating of **Suzumiya Haruhi no Heirets
 
 ![The intro to the game, translated.](images/Screenshot-2.png)
 
-## Future plans
+## Features
+* Open, edit and save game dialogue files (.bin)
+* Search game dialogue files for text
+
+## To-do
+* Event scene (cutscene) format analysis and then let this tool open and edit them
+* More research into misc stuff that needs translating:
+  * Menu text
+  * Character names
+  * Clubroom mode dialogue
+  * Graphics in some places if needed (Haruhi has its own weird version of the SHTX image format used in Shade games)
+* A bit more automation (i.e. let the tool open mcb files directly, maybe even have a tool that runs wit to extract the disk)
+
+### End goal
 As mentioned, the objective is to create a similar application to this that automatically extracts an ISO with wit, extracts the bln directories directly without need for Kuriimu, patches the Japanese binary files with English ones created with this tool and then uses wit to recompose the ISO disk image once again.
 
 Tl;dr: Use this to make an english patch and then make an english patcher tool.

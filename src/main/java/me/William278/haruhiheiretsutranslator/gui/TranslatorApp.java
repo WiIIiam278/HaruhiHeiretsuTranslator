@@ -18,32 +18,67 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.StringJoiner;
 
-public class TranslatorApp {
+public class TranslatorApp extends JFrame {
     private JTextArea FileEditorData;
     private JPanel MainPanel;
-    private JTextField SelectedFilePath;
+    public JTextField SelectedFilePath;
     private JButton BrowseButton;
     private JScrollPane FileEditorScrollPane;
     private JButton SaveButton;
     private JLabel EditingTooltip;
+    private JButton SearchButton;
 
     public static ScriptFile loadedFile;
     public static File workingDirectory = new File(System.getProperty("user.home"));
 
+    private static TranslatorApp instance;
+    public static TranslatorApp getInstance() {
+        return instance;
+    }
+
     public TranslatorApp() {
+        instance = this;
+
+        // Initialize form
+        setTitle("Haruhi Heiretsu Translator");
+        setContentPane(MainPanel);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setMinimumSize(new Dimension(800, 500));
+        pack();
+        setVisible(true);
+        try {
+            setIconImage(ImageIO.read(ClassLoader.getSystemResource("AppIcon.png")));
+        } catch (Exception e) {
+            System.out.println("An exception occurred loading the icon image.");
+        }
+
         // When a user presses the Browse button
         BrowseButton.addActionListener(e -> onBrowseButtonPressed());
 
         // Set default text of text box
-        FileEditorData.setText("Select a file to edit...\n\n\n\n\n\n\n\n");
+        FileEditorData.setText("Select a file to edit...");
 
         // When a user moves the caret
         FileEditorData.addCaretListener(e -> updateEditingTooltip());
 
         // When a user presses the Save As button
         SaveButton.addActionListener(e -> onSaveAsButtonPressed());
+
+        // When a user presses the Search button
+        SearchButton.addActionListener(e -> onSearchButtonPressed());
+    }
+
+    private void onSearchButtonPressed() {
+        if (TextSearcher.getInstance() == null) {
+            new TextSearcher();
+        } else {
+            TextSearcher textSearcher = TextSearcher.getInstance();
+            textSearcher.setVisible(true);
+            textSearcher.toFront();
+        }
     }
 
     private String getRowText(int row) {
@@ -64,8 +99,9 @@ public class TranslatorApp {
             if (caret != null) {
                 int caretPosition = FileEditorData.getCaretPosition();
                 int row = FileEditorData.getLineOfOffset(caretPosition);
-                if (row >= 0 && row < loadedFile.data.size()) {
-                    ScriptFile.DataItem sequence = loadedFile.data.stream().filter(dataItem -> dataItem.isSequence).toList().get(row);
+                final List<ScriptFile.DataItem> filteredItems = loadedFile.data.stream().filter(dataItem -> dataItem.isSequence).toList();
+                if (row >= 0 && row < filteredItems.size()) {
+                    ScriptFile.DataItem sequence = filteredItems.get(row);
                     String currentRowText = getRowText(row);
                     if (sequence != null && currentRowText != null) {
                         byte[] currentRowBytes = currentRowText.getBytes(Charset.forName("SHIFT_JIS"));
@@ -98,21 +134,21 @@ public class TranslatorApp {
      */
     private void $$$setupUI$$$() {
         MainPanel = new JPanel();
-        MainPanel.setLayout(new GridLayoutManager(5, 2, new Insets(0, 0, 0, 0), -1, -1));
+        MainPanel.setLayout(new GridLayoutManager(6, 2, new Insets(0, 0, 0, 0), -1, -1));
         MainPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5), null, TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, null, null));
         SelectedFilePath = new JTextField();
         SelectedFilePath.setEditable(false);
         SelectedFilePath.setEnabled(true);
-        MainPanel.add(SelectedFilePath, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(429, 30), null, 0, false));
+        MainPanel.add(SelectedFilePath, new GridConstraints(1, 0, 2, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(429, 30), null, 0, false));
         final JLabel label1 = new JLabel();
         label1.setText("File Editor");
-        MainPanel.add(label1, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(429, 16), null, 0, false));
+        MainPanel.add(label1, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(429, 16), null, 0, false));
         BrowseButton = new JButton();
         BrowseButton.setIcon(new ImageIcon(getClass().getResource("/OpenIcon.png")));
         BrowseButton.setText("Open...");
         MainPanel.add(BrowseButton, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         FileEditorScrollPane = new JScrollPane();
-        MainPanel.add(FileEditorScrollPane, new GridConstraints(3, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        MainPanel.add(FileEditorScrollPane, new GridConstraints(4, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         FileEditorData = new JTextArea();
         FileEditorData.setEditable(false);
         FileEditorData.setEnabled(true);
@@ -124,12 +160,16 @@ public class TranslatorApp {
         MainPanel.add(label2, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(429, 16), null, 0, false));
         EditingTooltip = new JLabel();
         EditingTooltip.setText("Editing Line: N/A");
-        MainPanel.add(EditingTooltip, new GridConstraints(4, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        MainPanel.add(EditingTooltip, new GridConstraints(5, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SaveButton = new JButton();
         SaveButton.setEnabled(false);
         SaveButton.setIcon(new ImageIcon(getClass().getResource("/SaveIcon.png")));
         SaveButton.setText("Save As...");
-        MainPanel.add(SaveButton, new GridConstraints(4, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        MainPanel.add(SaveButton, new GridConstraints(5, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        SearchButton = new JButton();
+        SearchButton.setIcon(new ImageIcon(getClass().getResource("/SearchIcon.png")));
+        SearchButton.setText("Search...");
+        MainPanel.add(SearchButton, new GridConstraints(2, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     /**
@@ -246,7 +286,7 @@ public class TranslatorApp {
                 "File saved successfully", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private void readFile() {
+    public void readFile() {
         if (SelectedFilePath.getText().isEmpty()) {
             JOptionPane.showMessageDialog(MainPanel, "Please select a text bin file first!",
                     "Error reading file", JOptionPane.ERROR_MESSAGE);
@@ -286,17 +326,7 @@ public class TranslatorApp {
 
     public static void main(String[] args) {
         setUITheme();
-        JFrame frame = new JFrame("Haruhi Heiretsu Translator");
         TranslatorApp application = new TranslatorApp();
-        frame.setContentPane(application.MainPanel);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.pack();
-        frame.setVisible(true);
-        try {
-            frame.setIconImage(ImageIO.read(ClassLoader.getSystemResource("AppIcon.png")));
-        } catch (Exception e) {
-            System.out.println("An exception occurred loading the icon image.");
-        }
     }
 
     private static void setUITheme() {

@@ -1,35 +1,42 @@
-package me.William278.haruhiheiretsutranslator.parser;
+package me.William278.haruhiheiretsutranslator.parser.formats;
+
+import me.William278.haruhiheiretsutranslator.parser.DataFile;
+import me.William278.haruhiheiretsutranslator.parser.utils.DataFileReader;
+import me.William278.haruhiheiretsutranslator.searcher.Search;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
-public class ScriptFile {
+public class ScriptFile extends DataFile {
 
     public ArrayList<DataItem> data;
 
-    public ScriptFile() {
+    public ScriptFile(byte[] rawData, String fileName, String filePath, String parentFileName, FileType format) {
+        super(rawData, fileName, filePath, parentFileName, format);
         data = new ArrayList<>();
     }
 
-    // Constructor for a new ScriptFile object based on an existing file
-    public ScriptFile(ScriptFile other) {
-        data = new ArrayList<>();
-        data.addAll(other.data);
+    public ScriptFile newFromThis() {
+        ScriptFile file = new ScriptFile(getByteArray(), fileName, filePath, parentFileName, format);
+        file.data = new ArrayList<>(data);
+        return file;
     }
 
     public void addDataItem(DataItem dataItem) {
         data.add(dataItem);
     }
 
-    public byte[] toByteArray() {
+    @Override
+    public byte[] getByteArray() {
         ArrayList<Byte> bytes = new ArrayList<>();
         for (DataItem d : data) {
             for (byte b : d.data) {
                 bytes.add(b);
             }
         }
-        return ScriptFileReader.toByteArray(bytes);
+        return DataFileReader.listToByteArray(bytes);
     }
 
     public void updateDataSequence(DataItem sequence) {
@@ -40,6 +47,29 @@ public class ScriptFile {
                 }
             }
         }
+    }
+
+
+
+    @Override
+    public ArrayList<Search.SearchResult> searchFile(String searchTerm) {
+        ArrayList<Search.SearchResult> results = new ArrayList<>();
+        int lineNumber = 0;
+        for (ScriptFile.DataItem item : data.stream().filter(dataItem -> dataItem.isSequence).toList()) {
+            if (item.toShiftJis().contains(searchTerm)) {
+                results.add(new Search.SearchResult(filePath, parentFileName, fileName, "line " + lineNumber, format));
+            }
+            lineNumber++;
+        }
+        return results;
+    }
+
+    // Get a DataItem from a byte array and assign it a flag if it is a text / information sequence
+    public static ScriptFile.DataItem getDataItem(List<Byte> currentSequence, boolean isSequence) {
+        // Convert sequence ArrayList to byte array
+        byte[] data = DataFileReader.listToByteArray(currentSequence);
+
+        return new ScriptFile.DataItem(data, isSequence);
     }
 
     public static class DataItem {
@@ -81,32 +111,5 @@ public class ScriptFile {
             return new String(data, Charset.forName("SHIFT_JIS"));
         }
 
-    }
-
-    // Returns a character name from a DataSequence containing a voiced line
-    public static String getCharacterName(DataItem voiceLineIdSequence) {
-        return switch (getCharacterId(voiceLineIdSequence).toLowerCase()) {
-            case "hrh" -> "Haruhi Suzumiya";
-            case "kyn" -> "Kyon";
-            case "mnl" -> "Kyon (Monologue)";
-            case "sis" -> "Kyon's Sister";
-            case "try" -> "Tsuruya-san";
-            case "ngt" -> "Yuki Nagato";
-            case "kzm" -> "Itsuki Koizumi";
-            case "mkr" -> "Mikuru Asahina";
-            case "tan" -> "Taniguchi";
-            case "kun" -> "Kunikida";
-            case "mkt" -> "Mikoto";
-            case "tai" -> "Taiichirou";
-            case "cap" -> "The Captain";
-            case "ann" -> "Announcer";
-            default -> getCharacterId(voiceLineIdSequence);
-        };
-    }
-
-    // Returns a character ID from a DataSequence containing a voiced line
-    public static String getCharacterId(DataItem voiceLineIdSequence) {
-        final String voiceLineId = voiceLineIdSequence.toShiftJis();
-        return voiceLineId.substring(voiceLineId.length() - 2);
     }
 }

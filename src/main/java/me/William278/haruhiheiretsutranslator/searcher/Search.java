@@ -1,8 +1,8 @@
 package me.William278.haruhiheiretsutranslator.searcher;
 
-import me.William278.haruhiheiretsutranslator.gui.TextSearcher;
-import me.William278.haruhiheiretsutranslator.parser.ScriptFile;
-import me.William278.haruhiheiretsutranslator.parser.ScriptFileReader;
+import me.William278.haruhiheiretsutranslator.parser.DataFile;
+import me.William278.haruhiheiretsutranslator.parser.formats.ScriptFile;
+import me.William278.haruhiheiretsutranslator.parser.utils.DataFileReader;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -12,10 +12,12 @@ public class Search implements Runnable {
 
     private final File directory;
     private final String searchTerm;
+    private final boolean showBinaryFiles;
 
-    public Search(String directoryPath, String searchTerm) {
+    public Search(String directoryPath, String searchTerm, boolean showBinaryFiles) {
         this.directory = new File(directoryPath);
         this.searchTerm = searchTerm;
+        this.showBinaryFiles = showBinaryFiles;
     }
 
     private ArrayList<SearchResult> search() {
@@ -39,18 +41,21 @@ public class Search implements Runnable {
         fileCount = files.size();
         for (File file : files) {
             // Load each file into a Script
-            ScriptFile fileAsScript = ScriptFileReader.readFile(file.getPath());
-            if (fileAsScript == null) {
+            DataFile readFile = DataFileReader.readFile(file.getPath());
+            if (readFile == null) {
                 continue;
             }
 
-            int lineNumber = 0;
-            for (ScriptFile.DataItem item : fileAsScript.data.stream().filter(dataItem -> dataItem.isSequence).toList()) {
-                if (item.toShiftJis().contains(searchTerm)) {
-                    results.add(new SearchResult(file.getPath(), file.getParentFile().getName(), file.getName(), lineNumber));
+            // Don't include binary files if the flag is set
+           if (!(readFile instanceof ScriptFile)) {
+                if (!showBinaryFiles) {
+                    continue;
                 }
-                lineNumber++;
             }
+
+            // Search the file
+            results.addAll(readFile.searchFile(searchTerm));
+
             filesSearched++;
         }
         return results;
@@ -82,9 +87,9 @@ public class Search implements Runnable {
         isSearchDone = true;
     }
 
-    public record SearchResult(String filePath, String parentFolderName, String fileName, int lineNumber) {
-        public String getFormattedResult() {
-            return parentFolderName + "/" + fileName + " (" + lineNumber + ")";
+    public record SearchResult(String filePath, String parentFolderName, String fileName, String locationInFile, DataFile.FileType fileType) {
+        public String[] getFormattedResult() {
+            return new String[] {parentFolderName, fileName, fileType.label, locationInFile};
         }
     }
 

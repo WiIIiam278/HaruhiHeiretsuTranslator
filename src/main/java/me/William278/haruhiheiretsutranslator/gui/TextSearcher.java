@@ -2,16 +2,16 @@ package me.William278.haruhiheiretsutranslator.gui;
 
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
+import me.William278.haruhiheiretsutranslator.parser.DataFile;
 import me.William278.haruhiheiretsutranslator.searcher.Search;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import static me.William278.haruhiheiretsutranslator.gui.TranslatorApp.workingDirectory;
 
@@ -20,13 +20,15 @@ public class TextSearcher extends JFrame {
     private JButton SelectFileButton;
     private JTextField SearchTermField;
     private JButton SearchButton;
-    private JList SearchResults;
     private JScrollPane SearchResultsScroller;
     private JButton OpenSelectedButton;
     private JPanel SearchPanel;
     private JProgressBar SearchProgress;
+    private JTable ResultsTable;
+    private JCheckBox ShowBinaryFilesCheck;
 
     private static TextSearcher instance;
+
     public static TextSearcher getInstance() {
         return instance;
     }
@@ -53,9 +55,7 @@ public class TextSearcher extends JFrame {
 
         SearchButton.addActionListener(e -> onSearchButtonPressed());
 
-        OpenSelectedButton.addActionListener(e -> {
-            onOpenSelectedButtonPressed();
-        });
+        OpenSelectedButton.addActionListener(e -> onOpenSelectedButtonPressed());
     }
 
     private void onSelectFileButtonPressed() {
@@ -79,22 +79,23 @@ public class TextSearcher extends JFrame {
 
         SearchProgress.setValue(0);
         SearchButton.setEnabled(false);
-        Search search = new Search(filePath, searchTerm);
+        Search search = new Search(filePath, searchTerm, ShowBinaryFilesCheck.isSelected());
         Thread searchThread = new Thread("Test") {
             @Override
             public void run() {
+                updateSearchResults(new ArrayList<>());
                 search.run();
                 while (!search.isSearchDone) {
                     SearchProgress.setValue((search.filesSearched / search.fileCount) * 100);
                 }
                 ArrayList<Search.SearchResult> results = search.results;
+                SearchButton.setEnabled(true);
                 if (results == null) {
                     JOptionPane.showMessageDialog(SearchPanel, "Invalid search parameters.",
                             "Error while searching", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 updateSearchResults(results);
-                SearchButton.setEnabled(true);
                 SearchProgress.setValue(100);
             }
         };
@@ -102,14 +103,36 @@ public class TextSearcher extends JFrame {
     }
 
     private ArrayList<Search.SearchResult> completedResults;
+
     private void updateSearchResults(ArrayList<Search.SearchResult> results) {
         completedResults = new ArrayList<>();
-        DefaultListModel<String> model = new DefaultListModel<>();
+
+        // Set up the table
+        DefaultTableModel model = new DefaultTableModel();
+        final String[] columnHeadings = {"Directory", "File", "Type", "Location"};
+        model.setColumnCount(columnHeadings.length);
+        model.setColumnIdentifiers(columnHeadings);
+
         for (Search.SearchResult result : results) {
             completedResults.add(result);
-            model.addElement(result.getFormattedResult());
+            model.addRow(result.getFormattedResult());
         }
-        SearchResults.setModel(model);
+        ResultsTable.setModel(model);
+    }
+
+    private void openFileDesktop(String filePath) {
+        File file = new File(filePath);
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                JOptionPane.showMessageDialog(SearchPanel, "Desktop environment not supported.",
+                        "Error while opening", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            Desktop.getDesktop().open(file); // Open the file on the desktop
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(SearchPanel, "Could not open binary file in your system editor.",
+                    "Error while opening", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void onOpenSelectedButtonPressed() {
@@ -117,6 +140,10 @@ public class TextSearcher extends JFrame {
         if (result == null) {
             JOptionPane.showMessageDialog(SearchPanel, "Please select a result to open",
                     "Error while opening", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (result.fileType() == DataFile.FileType.BINARY) {
+            openFileDesktop(result.filePath());
             return;
         }
         TranslatorApp translatorApp = TranslatorApp.getInstance();
@@ -133,10 +160,10 @@ public class TextSearcher extends JFrame {
     }
 
     private Search.SearchResult getSelectedResult() {
-        if (SearchResults.isSelectionEmpty()) {
+        if (ResultsTable.getSelectedRows().length != 1) {
             return null;
         }
-        int selectedResult = SearchResults.getSelectedIndex();
+        int selectedResult = ResultsTable.getSelectedRow();
         return completedResults.get(selectedResult);
     }
 
@@ -157,7 +184,7 @@ public class TextSearcher extends JFrame {
      */
     private void $$$setupUI$$$() {
         SearchPanel = new JPanel();
-        SearchPanel.setLayout(new GridLayoutManager(7, 4, new Insets(0, 0, 0, 0), -1, -1));
+        SearchPanel.setLayout(new GridLayoutManager(8, 4, new Insets(0, 0, 0, 0), -1, -1));
         SearchPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5), null, TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, null, null));
         final JLabel label1 = new JLabel();
         label1.setText("Search for text in bin files");
@@ -166,7 +193,7 @@ public class TextSearcher extends JFrame {
         FileSelectField.setEditable(false);
         SearchPanel.add(FileSelectField, new GridConstraints(1, 1, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         final JLabel label2 = new JLabel();
-        label2.setText("Select folder");
+        label2.setText("Folder to search");
         SearchPanel.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SearchTermField = new JTextField();
         SearchPanel.add(SearchTermField, new GridConstraints(2, 1, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
@@ -174,27 +201,33 @@ public class TextSearcher extends JFrame {
         label3.setText("Search term");
         SearchPanel.add(label3, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SearchResultsScroller = new JScrollPane();
-        SearchPanel.add(SearchResultsScroller, new GridConstraints(5, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
-        SearchResults = new JList();
-        SearchResults.setEnabled(true);
-        SearchResultsScroller.setViewportView(SearchResults);
+        SearchPanel.add(SearchResultsScroller, new GridConstraints(6, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        ResultsTable = new JTable();
+        SearchResultsScroller.setViewportView(ResultsTable);
         final JLabel label4 = new JLabel();
         label4.setText("Search results");
-        SearchPanel.add(label4, new GridConstraints(4, 0, 1, 4, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        SearchPanel.add(label4, new GridConstraints(5, 0, 1, 4, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         OpenSelectedButton = new JButton();
         OpenSelectedButton.setIcon(new ImageIcon(getClass().getResource("/OpenIcon.png")));
         OpenSelectedButton.setText("Edit Selected");
-        SearchPanel.add(OpenSelectedButton, new GridConstraints(6, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        SearchPanel.add(OpenSelectedButton, new GridConstraints(7, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SearchButton = new JButton();
         SearchButton.setIcon(new ImageIcon(getClass().getResource("/SearchIcon.png")));
         SearchButton.setText("Search");
-        SearchPanel.add(SearchButton, new GridConstraints(2, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        SearchPanel.add(SearchButton, new GridConstraints(2, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SelectFileButton = new JButton();
         SelectFileButton.setIcon(new ImageIcon(getClass().getResource("/OpenIcon.png")));
-        SelectFileButton.setText("Open...");
+        SelectFileButton.setText("Select...");
         SearchPanel.add(SelectFileButton, new GridConstraints(1, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         SearchProgress = new JProgressBar();
-        SearchPanel.add(SearchProgress, new GridConstraints(3, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        SearchPanel.add(SearchProgress, new GridConstraints(4, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label5 = new JLabel();
+        label5.setText("Search filters");
+        SearchPanel.add(label5, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        ShowBinaryFilesCheck = new JCheckBox();
+        ShowBinaryFilesCheck.setSelected(true);
+        ShowBinaryFilesCheck.setText("Binary files");
+        SearchPanel.add(ShowBinaryFilesCheck, new GridConstraints(3, 1, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     /**

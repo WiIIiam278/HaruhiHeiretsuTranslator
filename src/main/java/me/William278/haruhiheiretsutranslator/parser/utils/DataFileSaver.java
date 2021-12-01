@@ -1,9 +1,11 @@
-package me.William278.haruhiheiretsutranslator.parser;
+package me.William278.haruhiheiretsutranslator.parser.utils;
+
+import me.William278.haruhiheiretsutranslator.parser.formats.ScriptFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
 
-public class ScriptFileSaver {
+public class DataFileSaver {
 
     public static void saveScript(ScriptFile file, String targetFilePath) {
         try {
@@ -15,7 +17,7 @@ public class ScriptFileSaver {
 
             // Write to file and complete
             try (FileOutputStream fileOutputStream = new FileOutputStream(targetFile)) {
-                fileOutputStream.write(file.toByteArray());
+                fileOutputStream.write(file.getByteArray());
             }
         } catch (Exception e) {
             System.out.println("An error occurred reading/saving the file");

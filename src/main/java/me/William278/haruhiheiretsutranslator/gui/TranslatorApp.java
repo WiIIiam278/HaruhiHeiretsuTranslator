@@ -2,9 +2,10 @@ package me.William278.haruhiheiretsutranslator.gui;
 
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
-import me.William278.haruhiheiretsutranslator.parser.ScriptFile;
-import me.William278.haruhiheiretsutranslator.parser.ScriptFileReader;
-import me.William278.haruhiheiretsutranslator.parser.ScriptFileSaver;
+import me.William278.haruhiheiretsutranslator.parser.DataFile;
+import me.William278.haruhiheiretsutranslator.parser.formats.ScriptFile;
+import me.William278.haruhiheiretsutranslator.parser.utils.DataFileReader;
+import me.William278.haruhiheiretsutranslator.parser.utils.DataFileSaver;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -181,7 +182,7 @@ public class TranslatorApp extends JFrame {
 
     public static class BinFileFilter extends FileFilter {
         public String getDescription() {
-            return "Suzumiya Haruhi no Heiretsu Text Binaries (*.bin)";
+            return "Suzumiya Haruhi no Heiretsu Script Binaries (*.bin)";
         }
 
         public boolean accept(File f) {
@@ -248,7 +249,7 @@ public class TranslatorApp extends JFrame {
         int rows = FileEditorData.getText().split("\n").length;
 
         // Save a new ScriptFile with changes from source
-        ScriptFile newFile = new ScriptFile(loadedFile);
+        ScriptFile newFile = loadedFile.newFromThis();
         for (int row = 0; row < rows; row++) {
             ScriptFile.DataItem sequenceBeingEdited = loadedFile.data.stream().filter(data -> (data.isSequence)).toList().get(row);
             String currentRowText = getRowText(row);
@@ -278,10 +279,10 @@ public class TranslatorApp extends JFrame {
                 }
 
                 // Update the DataItem with the new one
-                newFile.updateDataSequence(new ScriptFile.DataItem(ScriptFileReader.toByteArray(finalBytes), true, sequenceBeingEdited.uuid));
+                newFile.updateDataSequence(new ScriptFile.DataItem(DataFileReader.listToByteArray(finalBytes), true, sequenceBeingEdited.uuid));
             }
         }
-        ScriptFileSaver.saveScript(newFile, filePath);
+        DataFileSaver.saveScript(newFile, filePath);
         JOptionPane.showMessageDialog(MainPanel, "Saved to " + filePath,
                 "File saved successfully", JOptionPane.INFORMATION_MESSAGE);
     }
@@ -292,15 +293,22 @@ public class TranslatorApp extends JFrame {
                     "Error reading file", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        ScriptFile readScript = ScriptFileReader.readFile(SelectedFilePath.getText());
-        if (readScript == null) {
+        DataFile file = DataFileReader.readFile(SelectedFilePath.getText());
+        if (file == null) {
             JOptionPane.showMessageDialog(MainPanel, "Could not read that file",
                     "Error reading file", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        loadedFile = readScript;
+        if (file.format != DataFile.FileType.BINARY) {
+            // Initialize the loaded file
+            loadedFile = (ScriptFile) file;
 
-        setTextFromScriptFile();
+            // Set the text editor to the file script
+            setTextFromScriptFile();
+        } else {
+            JOptionPane.showMessageDialog(MainPanel, "That file is not a valid script file",
+                    "Error reading file", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private void setTextFromScriptFile() {

@@ -201,7 +201,7 @@ public class TranslatorApp extends JFrame {
             fileSaver.setCurrentDirectory(currentDir);
             fileSaver.addChoosableFileFilter(new BinFileFilter());
             fileSaver.setAcceptAllFileFilterUsed(true);
-            fileSaver.setSelectedFile(new File(currentDir.getPath() + File.separator + "00000003.bin"));
+            fileSaver.setSelectedFile(new File(currentDir.getPath() + File.separator + loadedFile.fileName + "-out.bin"));
             int result = fileSaver.showSaveDialog(MainPanel);
             if (result != JFileChooser.APPROVE_OPTION) {
                 return;

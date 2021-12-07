@@ -1,4 +1,6 @@
 ![Suzumiya Haruhi no Heiretsu Translator](images/Banner.png)
+> **Update:** This project is now making use of [this tool](https://github.com/jonko0493/HaruhiHeiretsuEditor) instead.
+
 # Suzumiya Haruhi no Heiretsu Translator
 This tool allows for the editing and translating of **Suzumiya Haruhi no Heiretsu** (_Wii, 2009;_ EN: _The Parallel of Haruhi Suzumiya_) binary files that contain Japanese script data, to facilitate the production of an English patch.
 
